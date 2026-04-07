@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Literal
+
+import numpy as np
+
+RunMode = Literal["image", "video"]
+
+
+@dataclass
+class InferenceParams:
+    det_conf: float = 0.15
+    seg_conf: float = 0.10
+    seg_thr: float = 0.30
+    post_open: int = 0
+    post_close: int = 3
+    post_min_area: int = 25
+    frame_step: int = 1
+    max_frames: int = 0
+
+
+@dataclass
+class RunRequest:
+    mode: RunMode
+    input_path: Path
+    output_dir: Path
+    det_model_path: Path
+    seg_model_path: Path
+    enable_detection: bool = True
+    enable_segmentation: bool = True
+    cache_only: bool = True
+    params: InferenceParams = field(default_factory=InferenceParams)
+
+
+@dataclass
+class FrameResult:
+    mode: RunMode
+    frame_index: int
+    source_name: str
+    original_bgr: np.ndarray
+    overlay_bgr: np.ndarray
+    mask_u8: np.ndarray | None = None
+
+
+@dataclass
+class RunSummary:
+    mode: RunMode
+    source_path: str
+    total_frames: int
+    processed_frames: int
+    elapsed_seconds: float
+    stopped: bool
+    message: str = ""
+    last_frame_result: FrameResult | None = None

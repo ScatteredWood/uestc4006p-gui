@@ -1,0 +1,3 @@
+det_model: "E:/repositories/ultralytics/uestc4006p/checkpoints/train_det_rddcn_v8n_drone-and-motorbike-mixe/best.pt"
+seg_model: "E:/repositories/ultralytics/uestc4006p/checkpoints/train_seg_rddcn_best_pseg512_det20_sg400_sc55/best.pt"
+default_output_dir: "E:/repositories/uestc4006p-gui/outputs"
