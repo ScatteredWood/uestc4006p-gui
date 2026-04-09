@@ -4,7 +4,7 @@ from threading import Event
 
 from PySide6.QtCore import QObject, Signal, Slot
 
-from ..core.schemas import FrameResult, RunRequest, RunSummary
+from ..core.schemas import RunRequest
 from ..inference.cascade_engine import CascadeEngine
 
 
@@ -29,7 +29,7 @@ class InferenceWorker(QObject):
     @Slot()
     def run(self) -> None:
         try:
-            self.sig_log.emit("后台任务启动。")
+            self.sig_log.emit("后台任务启动")
             if self.request.mode == "image":
                 summary = self.engine.run_image(
                     self.request,
@@ -46,5 +46,5 @@ class InferenceWorker(QObject):
                     log=self.sig_log.emit,
                 )
             self.sig_finished.emit(summary)
-        except Exception as exc:  # pragma: no cover - 运行时异常分支
+        except Exception as exc:  # pragma: no cover
             self.sig_failed.emit(str(exc))

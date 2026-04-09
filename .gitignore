@@ -1,0 +1,24 @@
+# IDE
+.vscode/*
+!.vscode/settings.json
+
+# runtime / generated
+cache/
+logs/
+outputs/
+
+# packaging metadata
+*.egg-info/
+
+# python cache
+__pycache__/
+*.py[cod]
+
+# test / tool cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db

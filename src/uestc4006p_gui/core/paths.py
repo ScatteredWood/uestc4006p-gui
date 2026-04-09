@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
 import os
+from pathlib import Path
 
-# 项目根目录：.../uestc4006p-gui
+
+# 项目根目录: .../uestc4006p-gui
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SRC_ROOT = PROJECT_ROOT / "src"
 CONFIG_DIR = PROJECT_ROOT / "configs"
@@ -13,7 +14,7 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 
 DEFAULT_MODELS_YAML = CONFIG_DIR / "default_models.yaml"
 
-# 允许通过环境变量覆盖参考仓库路径，默认按当前项目约束填写。
+# 允许通过环境变量覆盖参考仓库路径。
 ULTRALYTICS_REPO = Path(
     os.environ.get("UESTC4006P_ULTRALYTICS_REPO", r"E:\repositories\ultralytics")
 )

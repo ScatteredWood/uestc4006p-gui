@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-import sys
 
 from ..core.paths import ULTRALYTICS_REPO, ULTRALYTICS_SCRIPTS_DIR
 
@@ -14,6 +14,7 @@ class BridgeObjects:
     cascade_one_image_v3c: Any
     draw_det_boxes: Any
     overlay_mask_red: Any
+    postprocess_mask: Any
 
 
 _BRIDGE_CACHE: BridgeObjects | None = None
@@ -21,16 +22,14 @@ _BRIDGE_CACHE: BridgeObjects | None = None
 
 def _inject_sys_paths() -> None:
     """
-    只在本文件内注入 sys.path。
-    其他模块禁止直接修改 sys.path。
+    仅在 bridge 中注入 sys.path，其他模块禁止修改 sys.path。
     """
-    candidates = [ULTRALYTICS_REPO, ULTRALYTICS_SCRIPTS_DIR]
-    for path in candidates:
+    for path in (ULTRALYTICS_REPO, ULTRALYTICS_SCRIPTS_DIR):
         if not path.exists():
             continue
-        path_str = str(path)
-        if path_str not in sys.path:
-            sys.path.insert(0, path_str)
+        p = str(path)
+        if p not in sys.path:
+            sys.path.insert(0, p)
 
 
 def _validate_path_exists(path: Path, desc: str) -> None:
@@ -52,10 +51,9 @@ def get_bridge_objects() -> BridgeObjects:
 
     try:
         from ultralytics import YOLO
-    except Exception as exc:  # pragma: no cover - 错误分支用于运行时提示
+    except Exception as exc:  # pragma: no cover
         raise RuntimeError(
-            "无法导入 ultralytics.YOLO。请确认 VS Code 使用的是 fyp_gui 环境，"
-            "并且该环境可访问本地 ultralytics 代码。"
+            "无法导入 ultralytics.YOLO。请确认 VS Code 使用的是 fyp_gui 环境。"
         ) from exc
 
     try:
@@ -63,12 +61,12 @@ def get_bridge_objects() -> BridgeObjects:
             cascade_one_image_v3c,
             draw_det_boxes,
             overlay_mask_red,
+            postprocess_mask,
         )
     except Exception as exc:  # pragma: no cover
         raise RuntimeError(
             "无法导入 cascade_infer_detseg 所需对象。"
-            "请确认 E:\\repositories\\ultralytics\\uestc4006p\\scripts 存在，"
-            "且脚本依赖项可在当前解释器中导入。"
+            "请确认 scripts 路径存在且依赖可在当前解释器导入。"
         ) from exc
 
     _BRIDGE_CACHE = BridgeObjects(
@@ -76,5 +74,6 @@ def get_bridge_objects() -> BridgeObjects:
         cascade_one_image_v3c=cascade_one_image_v3c,
         draw_det_boxes=draw_det_boxes,
         overlay_mask_red=overlay_mask_red,
+        postprocess_mask=postprocess_mask,
     )
     return _BRIDGE_CACHE

@@ -1,2 +1,0 @@
-[console_scripts]
-uestc4006p-gui = uestc4006p_gui.app:main

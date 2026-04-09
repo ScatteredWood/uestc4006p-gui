@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
+import shutil
 from datetime import datetime
 from pathlib import Path
-import json
 
 import cv2
 
@@ -47,6 +48,13 @@ class ResultWriter:
         return out
 
     @staticmethod
+    def _copy_if_exists(src: str, dst: Path) -> str:
+        if src and Path(src).exists():
+            shutil.copy2(src, dst)
+            return str(dst)
+        return ""
+
+    @staticmethod
     def _write_meta(run_dir: Path, request: RunRequest, summary: RunSummary, extra: dict | None = None) -> Path:
         meta = {
             "mode": request.mode,
@@ -65,6 +73,7 @@ class ResultWriter:
                 "post_min_area": request.params.post_min_area,
                 "frame_step": request.params.frame_step,
                 "max_frames": request.params.max_frames,
+                "preview_interval": request.params.preview_interval,
             },
             "summary": {
                 "total_frames": summary.total_frames,
@@ -72,6 +81,9 @@ class ResultWriter:
                 "elapsed_seconds": summary.elapsed_seconds,
                 "stopped": summary.stopped,
                 "message": summary.message,
+                "cache_overlay_video": summary.cache_overlay_video,
+                "cache_mask_video": summary.cache_mask_video,
+                "cache_video_playable": summary.cache_video_playable,
             },
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -84,8 +96,8 @@ class ResultWriter:
 
     def cache_run(self, request: RunRequest, summary: RunSummary) -> Path | None:
         """
-        默认缓存逻辑：仅缓存当前结果快照，不做大规模落盘。
-        视频模式仅缓存最后一帧预览和摘要。
+        默认缓存逻辑：只缓存当前结果快照和摘要，不写 outputs。
+        视频模式的成品缓存视频由 engine 在 cache 下直接生成。
         """
         if summary.last_frame_result is None:
             return None
@@ -96,29 +108,39 @@ class ResultWriter:
         return run_dir
 
     def save_current_result(self, request: RunRequest, summary: RunSummary) -> Path:
-        """
-        手动保存当前结果到 outputs。
-        视频模式保存当前帧结果，并写一份视频处理说明文本。
-        """
+        """手动保存当前结果到 outputs。"""
         if summary.last_frame_result is None:
             raise RuntimeError("当前没有可保存结果。请先执行一次推理。")
 
         output_root = request.output_dir if request.output_dir else self.outputs_root
         output_root.mkdir(parents=True, exist_ok=True)
+
         run_dir = self._create_run_dir(output_root, request.mode)
         self._write_frame_bundle(run_dir, summary.last_frame_result)
 
         extra: dict[str, str] = {}
         if request.mode == "video":
-            note_path = run_dir / "video_note.txt"
-            note_path.write_text(
-                "视频模式手动保存说明\n"
-                f"- 输入视频: {request.input_path}\n"
-                f"- 当前预览帧: {summary.last_frame_result.frame_index}\n"
-                "- 第一版 MVP 默认保存当前帧结果，不自动导出完整 overlay 视频。\n",
-                encoding="utf-8",
+            overlay_saved = self._copy_if_exists(
+                summary.cache_overlay_video,
+                run_dir / "overlay_video.mp4",
             )
-            extra["video_note"] = str(note_path)
+            mask_saved = self._copy_if_exists(
+                summary.cache_mask_video,
+                run_dir / "mask_video.mp4",
+            )
+            if overlay_saved:
+                extra["saved_overlay_video"] = overlay_saved
+            if mask_saved:
+                extra["saved_mask_video"] = mask_saved
+            if not overlay_saved and not mask_saved:
+                note_path = run_dir / "video_note.txt"
+                note_path.write_text(
+                    "视频模式未检测到可复制的缓存视频。\n"
+                    f"输入视频: {request.input_path}\n"
+                    f"当前帧: {summary.last_frame_result.frame_index}\n",
+                    encoding="utf-8",
+                )
+                extra["video_note"] = str(note_path)
 
         self._write_meta(run_dir, request, summary, extra=extra)
         return run_dir

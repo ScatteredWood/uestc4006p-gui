@@ -19,6 +19,7 @@ class InferenceParams:
     post_min_area: int = 25
     frame_step: int = 1
     max_frames: int = 0
+    preview_interval: int = 5
 
 
 @dataclass
@@ -42,6 +43,14 @@ class FrameResult:
     original_bgr: np.ndarray
     overlay_bgr: np.ndarray
     mask_u8: np.ndarray | None = None
+    det_count: int = 0
+    det_conf_max: float = 0.0
+    det_conf_mean: float = 0.0
+    segmentation_enabled: bool = False
+    model_infer_ms: float = 0.0
+    postprocess_ms: float = 0.0
+    viz_ms: float = 0.0
+    est_fps: float = 0.0
 
 
 @dataclass
@@ -54,3 +63,6 @@ class RunSummary:
     stopped: bool
     message: str = ""
     last_frame_result: FrameResult | None = None
+    cache_overlay_video: str = ""
+    cache_mask_video: str = ""
+    cache_video_playable: bool = False
