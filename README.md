@@ -1,68 +1,33 @@
-# UESTC4006P GUI MVP
+# UESTC4006P GUI
 
-用于老师演示的桌面 GUI 最小可运行版本（MVP）。
+UESTC4006P GUI 是一个基于 Python 的桌面图形界面工具，用于对目标检测、图像分割以及级联推理流程进行可视化操作与结果导出。
 
-## 1. 先确认 VS Code 解释器是 `fyp_gui`
+该项目面向课程设计 / 毕业设计中的工程化实现，重点在于将模型推理流程封装为可交互、可配置、可打包的桌面应用，而不是单纯的训练脚本集合。
 
-不要跳过这一步：
+---
 
-1. 在 VS Code 右下角点击 Python 解释器名称。
-2. 选择 `fyp_gui` 对应的解释器（通常显示为 `conda (fyp_gui)`）。
-3. 也可以用命令面板：`Ctrl+Shift+P` -> `Python: Select Interpreter` -> 选择 `fyp_gui`。
-4. 在 VS Code 终端运行：
+## 主要功能
 
-```powershell
-python -c "import sys,os; print(sys.executable); print(os.environ.get('CONDA_DEFAULT_ENV'))"
-```
+- 图形化选择输入图片、视频或文件夹
+- 支持检测、分割及级联推理流程
+- 支持加载自定义模型权重与默认模型配置
+- 支持结果预览与导出
+- 支持将项目进一步打包为 Windows 单文件 `.exe`
 
-预期 `CONDA_DEFAULT_ENV` 输出为 `fyp_gui`。
+---
 
-## 2. 安装
+## 项目结构
 
-在 `E:\repositories\uestc4006p-gui` 下执行：
-
-```powershell
-python -m pip install -U pip
-python -m pip install -e .
-python -m pip install -e .[dev]
-```
-
-## 3. 启动 GUI
-
-```powershell
-python -m uestc4006p_gui.app
-```
-
-或：
-
-```powershell
-uestc4006p-gui
-```
-
-## 4. 当前 MVP 支持
-
-1. 单图推理（检测 / 可选分割）。
-2. 单视频推理（`frame_step`、`max_frames`、后台线程、可停止）。
-3. 模型路径、输入路径、输出目录选择。
-4. 原图 / overlay / mask 预览切换。
-5. 默认仅缓存预览（`cache/`）。
-6. 手动保存当前结果到 `outputs/`。
-7. tooltip、statusTip、状态栏、日志区。
-
-## 5. 当前不支持
-
-1. 摄像头正式支持。
-2. 文件夹批处理。
-3. 复杂统计报表。
-4. exe 打包。
-5. 实时多线程视频流优化。
-
-## 6. 约束说明
-
-1. 仅在 `inference/ultra_bridge.py` 内做 `sys.path` 注入。
-2. GUI 通过函数级接口复用：
-   - `cascade_one_image_v3c`
-   - `draw_det_boxes`
-   - `overlay_mask_red`
-3. 不复用 `CLI main()`。
-4. 不修改 `E:\repositories\ultralytics` 仓库源码。
+```text
+uestc4006p-gui/
+├─ configs/
+│  └─ default_models.yaml
+├─ src/
+│  └─ uestc4006p_gui/
+│     ├─ app.py
+│     ├─ core/
+│     ├─ inference/
+│     └─ ui/
+├─ tests/
+├─ pyproject.toml
+└─ README.md
