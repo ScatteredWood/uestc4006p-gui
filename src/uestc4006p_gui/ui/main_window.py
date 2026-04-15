@@ -36,7 +36,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..core.paths import CACHE_DIR, DEFAULT_MODELS_YAML, LOGS_DIR, OUTPUTS_DIR, ensure_runtime_dirs
+from ..core.paths import (
+    CACHE_DIR,
+    DEFAULT_MODELS_YAML,
+    DEFAULT_MODELS_YAML_CANDIDATES,
+    LOGS_DIR,
+    OUTPUTS_DIR,
+    ULTRALYTICS_REPO,
+    ULTRALYTICS_SCRIPTS_DIR,
+    ensure_runtime_dirs,
+    resolve_configured_path,
+)
 from ..core.schemas import FrameResult, InferenceParams, RunRequest, RunSummary
 from ..core.settings import HELP_TEXTS, UI_DEFAULTS
 from ..inference.cascade_engine import CascadeEngine
@@ -86,6 +96,7 @@ class MainWindow(QMainWindow):
         self.media_player = None
         self.settings = QSettings("UESTC4006P", "GUI")
         self._cleanup_retry_queue: list[Path] = []
+        self._startup_notices: list[str] = []
 
         self.setWindowTitle("UESTC4006P GUI MVP")
         self.resize(1680, 920)
@@ -94,9 +105,11 @@ class MainWindow(QMainWindow):
         self._init_video_player()
         self._load_defaults_from_yaml()
         self._load_path_history()
+        self._collect_runtime_startup_notices()
         self._on_mode_changed()
         self._set_running(False)
         self._update_result_summary()
+        self._show_startup_notices()
 
     def _setup_ui(self) -> None:
         root = QWidget(self)
@@ -566,14 +579,79 @@ class MainWindow(QMainWindow):
         self.seg_model_edit.clear()
         self.output_dir_edit.setText(str(OUTPUTS_DIR))
         if not DEFAULT_MODELS_YAML.exists():
+            candidates = " | ".join(str(p) for p in DEFAULT_MODELS_YAML_CANDIDATES)
+            self._startup_notices.append(
+                "未找到默认模型配置 default_models.yaml。"
+                "GUI 可正常启动，请在界面中手动选择模型后再运行推理。"
+                f"\n已检查路径: {candidates}"
+            )
             return
+
         try:
             cfg = yaml.safe_load(DEFAULT_MODELS_YAML.read_text(encoding="utf-8")) or {}
-            out_cfg = str(cfg.get("default_output_dir", OUTPUTS_DIR)).strip()
-            out_path = Path(out_cfg) if out_cfg else OUTPUTS_DIR
-            self.output_dir_edit.setText(str(out_path if out_path.exists() else Path.home()))
+            if not isinstance(cfg, dict):
+                raise ValueError("default_models.yaml 顶层必须是 YAML 映射（key-value）。")
         except Exception as exc:
-            self._append_log(f"[WARN] 读取 default_models.yaml 失败: {exc}")
+            self._startup_notices.append(f"读取默认模型配置失败: {exc}")
+            return
+
+        for key, edit, label in (
+            ("det_model", self.det_model_edit, "检测模型"),
+            ("seg_model", self.seg_model_edit, "分割模型"),
+        ):
+            raw = str(cfg.get(key, "") or "").strip()
+            if not raw:
+                continue
+            path = resolve_configured_path(raw, base_dir=DEFAULT_MODELS_YAML.parent)
+            if path is not None and path.exists() and path.is_file():
+                edit.setText(str(path))
+            else:
+                self._startup_notices.append(
+                    f"default_models.yaml 中的默认{label}不存在: {raw}\n"
+                    "不影响 GUI 启动，可在界面中手动选择模型。"
+                )
+
+        out_raw = str(cfg.get("default_output_dir", "") or "").strip()
+        out_path = (
+            resolve_configured_path(out_raw, base_dir=DEFAULT_MODELS_YAML.parent)
+            if out_raw
+            else OUTPUTS_DIR
+        )
+        if out_path is None:
+            out_path = OUTPUTS_DIR
+        try:
+            out_path.mkdir(parents=True, exist_ok=True)
+            self.output_dir_edit.setText(str(out_path))
+        except Exception as exc:
+            self.output_dir_edit.setText(str(OUTPUTS_DIR))
+            self._startup_notices.append(f"默认输出目录不可用，已回退到 outputs: {exc}")
+
+    def _collect_runtime_startup_notices(self) -> None:
+        if ULTRALYTICS_REPO.exists() and ULTRALYTICS_SCRIPTS_DIR.exists():
+            return
+        self._startup_notices.append(
+            "未检测到可用的 ultralytics 推理脚本目录。"
+            f"\n当前仓库路径: {ULTRALYTICS_REPO}"
+            f"\n当前脚本路径: {ULTRALYTICS_SCRIPTS_DIR}"
+            "\n这不会阻止 GUI 启动，但会导致推理无法开始。"
+            "\n请配置 UESTC4006P_ULTRALYTICS_REPO 或放置到默认候选路径。"
+        )
+
+    def _show_startup_notices(self) -> None:
+        if not self._startup_notices:
+            return
+
+        for item in self._startup_notices:
+            self._append_log(f"[STARTUP][WARN] {item}")
+
+        lines = [f"{idx + 1}. {item}" for idx, item in enumerate(self._startup_notices)]
+        QMessageBox.warning(
+            self,
+            "启动检查提示",
+            "检测到以下问题（不会导致 GUI 直接退出）：\n\n"
+            + "\n\n".join(lines)
+            + "\n\n你仍可打开界面并手动选择模型；修复后重新点击“开始”。",
+        )
 
     def _browse_input_by_mode(self) -> None:
         mode = self.mode_combo.currentData()
@@ -858,6 +936,15 @@ class MainWindow(QMainWindow):
             seg_model_path = Path(seg_text)
             if not seg_model_path.exists() or not seg_model_path.is_file():
                 return False, "分割模型路径不存在或不是文件，请重新选择。"
+
+        dep_ok, dep_msg = self.engine.check_dependencies()
+        if not dep_ok:
+            return (
+                False,
+                "推理依赖未就绪，当前无法开始推理。\n"
+                f"{dep_msg}\n"
+                "请修复路径或依赖后重试，GUI 不会退出。",
+            )
 
         return True, ""
 

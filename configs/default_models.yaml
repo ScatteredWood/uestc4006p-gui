@@ -1,3 +1,6 @@
-det_model: "E:/repositories/ultralytics/uestc4006p/checkpoints/train_det_rddcn_v8n_drone-and-motorbike-mixe/best.pt"
-seg_model: "E:/repositories/ultralytics/uestc4006p/checkpoints/train_seg_rddcn_best_pseg512_det20_sg400_sc55/best.pt"
-default_output_dir: "E:/repositories/uestc4006p-gui/outputs"
+# 可留空。留空时 GUI 启动后由用户手动选择模型文件。
+det_model: ""
+seg_model: ""
+
+# 支持相对路径，默认相对仓库根目录或 exe 所在目录。
+default_output_dir: "outputs"

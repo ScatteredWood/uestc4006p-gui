@@ -5,10 +5,22 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from .ui.main_window import MainWindow
+try:
+    from .core.paths import BUNDLE_ROOT, IS_FROZEN, RUNTIME_ROOT
+    from .ui.main_window import MainWindow
+except ImportError:  # pragma: no cover
+    # 兼容 PyInstaller 以脚本入口执行时的绝对导入。
+    from uestc4006p_gui.core.paths import BUNDLE_ROOT, IS_FROZEN, RUNTIME_ROOT
+    from uestc4006p_gui.ui.main_window import MainWindow
 
 
 def _build_env_hint() -> str:
+    if IS_FROZEN:
+        return (
+            "[ENV] 当前运行模式: PyInstaller onefile。"
+            f" executable={sys.executable}, runtime_root={RUNTIME_ROOT}, bundle_root={BUNDLE_ROOT}"
+        )
+
     conda_env = os.environ.get("CONDA_DEFAULT_ENV", "").strip()
     exe = sys.executable
     if conda_env == "fyp_gui":

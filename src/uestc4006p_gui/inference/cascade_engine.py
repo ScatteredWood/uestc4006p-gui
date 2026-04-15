@@ -27,8 +27,24 @@ class CascadeEngine:
     """
 
     def __init__(self) -> None:
-        self.bridge = get_bridge_objects()
+        self._bridge = None
         self._model_cache: dict[str, object] = {}
+
+    def _ensure_bridge(self):
+        if self._bridge is None:
+            self._bridge = get_bridge_objects()
+        return self._bridge
+
+    @property
+    def bridge(self):
+        return self._ensure_bridge()
+
+    def check_dependencies(self) -> tuple[bool, str]:
+        try:
+            self._ensure_bridge()
+            return True, ""
+        except Exception as exc:
+            return False, str(exc)
 
     @staticmethod
     def _safe_token(text: str) -> str:

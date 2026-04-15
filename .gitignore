@@ -7,6 +7,14 @@ cache/
 logs/
 outputs/
 
+# PyInstaller
+build/
+dist/
+*.spec
+!uestc4006p_gui.spec
+build_temp/
+dist_temp/
+
 # packaging metadata
 *.egg-info/
 
@@ -18,6 +26,12 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tmp_pycache/
+
+# virtual env
+.venv/
+venv/
+env/
 
 # OS
 .DS_Store
