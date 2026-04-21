@@ -84,6 +84,8 @@ class ResultWriter:
                 "cache_overlay_video": summary.cache_overlay_video,
                 "cache_mask_video": summary.cache_mask_video,
                 "cache_video_playable": summary.cache_video_playable,
+                "current_device": summary.current_device,
+                "device_note": summary.device_note,
             },
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }

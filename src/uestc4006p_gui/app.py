@@ -14,8 +14,14 @@ except ImportError:  # pragma: no cover
     from uestc4006p_gui.ui.main_window import MainWindow
 
 
-def _build_env_hint() -> str:
+def _build_env_hint(language: str = "zh") -> str:
+    is_en = str(language).lower().startswith("en")
     if IS_FROZEN:
+        if is_en:
+            return (
+                "[ENV] Runtime mode: PyInstaller onefile. "
+                f"executable={sys.executable}, runtime_root={RUNTIME_ROOT}, bundle_root={BUNDLE_ROOT}"
+            )
         return (
             "[ENV] 当前运行模式: PyInstaller onefile。"
             f" executable={sys.executable}, runtime_root={RUNTIME_ROOT}, bundle_root={BUNDLE_ROOT}"
@@ -24,7 +30,15 @@ def _build_env_hint() -> str:
     conda_env = os.environ.get("CONDA_DEFAULT_ENV", "").strip()
     exe = sys.executable
     if conda_env == "fyp_gui":
+        if is_en:
+            return f"[ENV] Current interpreter: {exe} | CONDA_DEFAULT_ENV=fyp_gui"
         return f"[ENV] 当前解释器: {exe} | CONDA_DEFAULT_ENV=fyp_gui"
+    if is_en:
+        return (
+            "[ENV][WARN] Current interpreter may not be fyp_gui. "
+            f"executable={exe}, CONDA_DEFAULT_ENV={conda_env or 'N/A'}. "
+            "Please switch to fyp_gui in VS Code (bottom-right) before running."
+        )
     return (
         "[ENV][WARN] 当前解释器可能不是 fyp_gui。"
         f" executable={exe}, CONDA_DEFAULT_ENV={conda_env or 'N/A'}。"
@@ -35,7 +49,7 @@ def _build_env_hint() -> str:
 def main() -> int:
     app = QApplication(sys.argv)
     win = MainWindow()
-    win.append_startup_hint(_build_env_hint())
+    win.append_startup_hint(_build_env_hint(win.language))
     win.show()
     return app.exec()
 

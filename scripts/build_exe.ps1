@@ -1,3 +1,8 @@
+param(
+    [ValidateSet("onefile", "onedir")]
+    [string]$Mode = "onefile"
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -31,6 +36,11 @@ Write-Host "[build] python: $pythonExe"
 & $pythonExe -m PyInstaller --version | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller is not available in current interpreter. Install with: python -m pip install pyinstaller"
+}
+
+& $pythonExe -c "import ultralytics, torch; print('ok')" | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Missing required packages for distributable build. Please install ultralytics and torch first."
 }
 
 function Clear-BuildFolder {
@@ -68,10 +78,52 @@ $tempWork = Join-Path $tempRoot "build"
 Clear-BuildFolder -TargetPath $tempRoot
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
-Write-Host "[build] run: PyInstaller onefile"
-& $pythonExe -m PyInstaller --noconfirm --clean --distpath $tempDist --workpath $tempWork $specFile
+Write-Host "[build] run: PyInstaller $Mode"
+if ($Mode -eq "onefile") {
+    & $pythonExe -m PyInstaller --noconfirm --clean --distpath $tempDist --workpath $tempWork $specFile
+}
+else {
+    $entryScript = Join-Path $repoRoot "src\\uestc4006p_gui\\app.py"
+    $srcPath = Join-Path $repoRoot "src"
+
+    & $pythonExe -m PyInstaller `
+        --noconfirm --clean `
+        --onedir `
+        --name "uestc4006p_gui" `
+        --paths $srcPath `
+        --collect-all cv2 `
+        --collect-all ultralytics `
+        --collect-all torch `
+        --collect-submodules ultralytics `
+        --collect-submodules torch `
+        --exclude-module PyQt5 `
+        --exclude-module PyQt6 `
+        --distpath $tempDist `
+        --workpath $tempWork `
+        $entryScript
+}
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller build failed."
+}
+
+$distDir = Join-Path $repoRoot "dist"
+New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+
+if ($Mode -eq "onedir") {
+    $tempDir = Join-Path $tempDist "uestc4006p_gui"
+    if (-not (Test-Path $tempDir)) {
+        throw "Build finished but temp onedir was not found: $tempDir"
+    }
+    $targetDir = Join-Path $distDir "uestc4006p_gui"
+    Clear-BuildFolder -TargetPath $targetDir
+    if (-not (Test-Path $targetDir)) {
+        New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+    }
+    Get-ChildItem -LiteralPath $tempDir -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $targetDir -Recurse -Force
+    }
+    Write-Host "[build] success: $targetDir"
+    return
 }
 
 $tempExe = Join-Path $tempDist "uestc4006p_gui.exe"
@@ -79,10 +131,7 @@ if (-not (Test-Path $tempExe)) {
     throw "Build finished but temp exe was not found: $tempExe"
 }
 
-$distDir = Join-Path $repoRoot "dist"
 $exePath = Join-Path $distDir "uestc4006p_gui.exe"
-New-Item -ItemType Directory -Path $distDir -Force | Out-Null
-
 if (Test-Path $exePath) {
     try {
         Remove-Item -LiteralPath $exePath -Force -ErrorAction Stop

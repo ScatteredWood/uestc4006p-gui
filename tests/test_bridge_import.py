@@ -6,17 +6,20 @@ import pytest
 def test_bridge_import_objects() -> None:
     """
     基础导入测试：
-    1) bridge 能否完成路径注入
+    1) bridge 能否在不依赖外部仓库路径的情况下导入
     2) 关键对象是否可导入
     """
+    pytest.importorskip("torch")
+    pytest.importorskip("ultralytics")
+
     try:
         from uestc4006p_gui.inference.ultra_bridge import get_bridge_objects
 
         bridge = get_bridge_objects()
     except Exception as exc:  # pragma: no cover
         pytest.fail(
-            "bridge 导入失败。请确认 VS Code 解释器为 fyp_gui，"
-            "并确认 E:\\repositories\\ultralytics 路径可访问。"
+            "bridge 导入失败。请确认已安装 ultralytics/torch，"
+            "且打包产物包含内置推理模块。"
             f"\n原始错误: {exc}"
         )
 

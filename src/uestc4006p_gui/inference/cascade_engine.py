@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Callable
+from queue import Queue
+from threading import Thread
 
 import cv2
 import numpy as np
@@ -29,6 +31,9 @@ class CascadeEngine:
     def __init__(self) -> None:
         self._bridge = None
         self._model_cache: dict[str, object] = {}
+        self.runtime_device: str = "cpu"
+        self.runtime_device_note: str = "未进行设备探测。"
+        self._device_initialized = False
 
     def _ensure_bridge(self):
         if self._bridge is None:
@@ -39,12 +44,107 @@ class CascadeEngine:
     def bridge(self):
         return self._ensure_bridge()
 
-    def check_dependencies(self) -> tuple[bool, str]:
+    @staticmethod
+    def _run_with_timeout(fn, timeout_seconds: float, timeout_message: str) -> tuple[bool, str]:
+        q: Queue[tuple[bool, str]] = Queue(maxsize=1)
+
+        def _task():
+            try:
+                fn()
+                q.put((True, ""))
+            except Exception as exc:  # pragma: no cover
+                q.put((False, str(exc)))
+
+        th = Thread(target=_task, daemon=True)
+        th.start()
+        th.join(timeout=max(0.1, float(timeout_seconds)))
+        if th.is_alive():
+            return False, timeout_message
+        return q.get_nowait() if not q.empty() else (False, "未知错误：自检线程未返回结果。")
+
+    @staticmethod
+    def _format_device(device: str) -> str:
+        return "CUDA:0" if str(device).lower().startswith("cuda") else "CPU"
+
+    def current_device_display(self) -> str:
+        return self._format_device(self.runtime_device)
+
+    def ensure_runtime_device(self, timeout_seconds: float = 8.0, force_refresh: bool = False) -> tuple[str, str]:
+        if self._device_initialized and not force_refresh:
+            return self.runtime_device, self.runtime_device_note
+
         try:
-            self._ensure_bridge()
-            return True, ""
+            import torch
         except Exception as exc:
-            return False, str(exc)
+            self.runtime_device = "cpu"
+            self.runtime_device_note = f"未安装/无法导入 torch，自动回退 CPU: {exc}"
+            self._device_initialized = True
+            return self.runtime_device, self.runtime_device_note
+
+        cuda_status: dict[str, object] = {"ok": False, "error": ""}
+
+        def _probe_cuda():
+            try:
+                if not torch.cuda.is_available():
+                    cuda_status["ok"] = False
+                    cuda_status["error"] = "torch.cuda.is_available() 为 False。"
+                    return
+                _ = torch.zeros((1,), device="cuda:0")
+                torch.cuda.synchronize()
+                cuda_status["ok"] = True
+            except Exception as exc:  # pragma: no cover
+                cuda_status["ok"] = False
+                cuda_status["error"] = str(exc)
+
+        ok, msg = self._run_with_timeout(
+            _probe_cuda,
+            timeout_seconds=timeout_seconds,
+            timeout_message="CUDA 探测超时，自动回退 CPU。",
+        )
+        if not ok:
+            self.runtime_device = "cpu"
+            self.runtime_device_note = msg
+            self._device_initialized = True
+            return self.runtime_device, self.runtime_device_note
+
+        if bool(cuda_status.get("ok")):
+            self.runtime_device = "cuda:0"
+            self.runtime_device_note = "检测到可用 NVIDIA GPU，已优先使用 CUDA:0。"
+        else:
+            self.runtime_device = "cpu"
+            fallback_reason = str(cuda_status.get("error") or "未检测到可用 CUDA。")
+            self.runtime_device_note = f"自动回退 CPU：{fallback_reason}"
+        self._device_initialized = True
+        return self.runtime_device, self.runtime_device_note
+
+    def check_dependencies(self, timeout_seconds: float = 10.0) -> tuple[bool, str]:
+        ok, msg = self._run_with_timeout(
+            self._ensure_bridge,
+            timeout_seconds=timeout_seconds,
+            timeout_message="推理依赖初始化超时，请检查 ultralytics/torch 依赖。",
+        )
+        if not ok:
+            return False, msg
+        device, note = self.ensure_runtime_device(timeout_seconds=min(5.0, timeout_seconds))
+        return True, f"当前设备: {self._format_device(device)} | {note}"
+
+    def startup_self_check(self, timeout_seconds: float = 12.0) -> tuple[bool, str]:
+        def _check():
+            import cv2  # noqa: F401
+            import numpy  # noqa: F401
+            import yaml  # noqa: F401
+
+            self._ensure_bridge()
+            self.ensure_runtime_device(timeout_seconds=min(6.0, timeout_seconds), force_refresh=True)
+
+        ok, msg = self._run_with_timeout(
+            _check,
+            timeout_seconds=timeout_seconds,
+            timeout_message="启动自检超时，已跳过自检并允许继续使用 GUI。",
+        )
+        if not ok:
+            return False, msg
+        return True, f"当前设备: {self._format_device(self.runtime_device)} | {self.runtime_device_note}"
 
     @staticmethod
     def _safe_token(text: str) -> str:
@@ -77,13 +177,30 @@ class CascadeEngine:
             return self._model_cache[p]
         if not weight_path.exists():
             raise FileNotFoundError(f"{role}模型不存在: {weight_path}")
+        self.ensure_runtime_device()
         model = self.bridge.YOLO(p)
+        try:
+            model.to(self.runtime_device)
+        except Exception as exc:
+            if str(self.runtime_device).startswith("cuda"):
+                self.runtime_device = "cpu"
+                self.runtime_device_note = f"{role}模型加载到 CUDA 失败，自动回退 CPU: {exc}"
+                self._device_initialized = True
+                model.to("cpu")
+            else:
+                raise
         self._model_cache[p] = model
         return model
 
     def _run_detection_only(self, image_bgr: np.ndarray, det_model: object, det_conf: float):
         t0 = perf_counter()
-        det_res = det_model.predict(image_bgr, conf=float(det_conf), iou=0.5, verbose=False)[0]
+        det_res = det_model.predict(
+            image_bgr,
+            conf=float(det_conf),
+            iou=0.5,
+            verbose=False,
+            device=self.runtime_device,
+        )[0]
         model_infer_ms = (perf_counter() - t0) * 1000.0
 
         t1 = perf_counter()
@@ -126,6 +243,7 @@ class CascadeEngine:
             big_use_clahe=False,
             clahe_clip=2.0,
             clahe_grid=8,
+            device=self.runtime_device,
             debug_dir=None,
             debug_prefix="",
             # 这里关闭脚本内后处理，改为 GUI engine 计时后再处理。
@@ -217,8 +335,49 @@ class CascadeEngine:
             est_fps=est_fps,
         )
 
+    def _move_cached_models_to_cpu(self) -> None:
+        for model in self._model_cache.values():
+            try:
+                model.to("cpu")
+            except Exception:
+                pass
+
+    def _infer_one_frame_guarded(
+        self,
+        frame_bgr: np.ndarray,
+        request: RunRequest,
+        frame_index: int,
+        source_name: str,
+        log: LogFn | None = None,
+    ) -> FrameResult:
+        try:
+            return self._infer_one_frame(
+                frame_bgr=frame_bgr,
+                request=request,
+                frame_index=frame_index,
+                source_name=source_name,
+                log=log,
+            )
+        except Exception as exc:
+            if str(self.runtime_device).startswith("cuda"):
+                self.runtime_device = "cpu"
+                self.runtime_device_note = f"CUDA 推理失败后自动回退 CPU: {exc}"
+                self._device_initialized = True
+                self._move_cached_models_to_cpu()
+                if log:
+                    log(self.runtime_device_note)
+                return self._infer_one_frame(
+                    frame_bgr=frame_bgr,
+                    request=request,
+                    frame_index=frame_index,
+                    source_name=source_name,
+                    log=log,
+                )
+            raise
+
     def run_image(self, request: RunRequest, log: LogFn | None = None) -> RunSummary:
         t0 = perf_counter()
+        self.ensure_runtime_device()
         if not request.input_path.exists():
             raise FileNotFoundError(f"输入图片不存在: {request.input_path}")
 
@@ -226,7 +385,7 @@ class CascadeEngine:
         if image_bgr is None:
             raise RuntimeError(f"无法读取图片: {request.input_path}")
 
-        frame_result = self._infer_one_frame(
+        frame_result = self._infer_one_frame_guarded(
             frame_bgr=image_bgr,
             request=request,
             frame_index=1,
@@ -253,6 +412,8 @@ class CascadeEngine:
             stopped=False,
             message="图片推理完成",
             last_frame_result=frame_result,
+            current_device=self._format_device(self.runtime_device),
+            device_note=self.runtime_device_note,
         )
 
     def run_video(
@@ -264,6 +425,7 @@ class CascadeEngine:
         log: LogFn | None = None,
     ) -> RunSummary:
         t0 = perf_counter()
+        self.ensure_runtime_device()
         if not request.input_path.exists():
             raise FileNotFoundError(f"输入视频不存在: {request.input_path}")
 
@@ -354,7 +516,7 @@ class CascadeEngine:
 
                 if do_infer:
                     processed_count += 1
-                    last_result = self._infer_one_frame(
+                    last_result = self._infer_one_frame_guarded(
                         frame_bgr=frame_bgr,
                         request=request,
                         frame_index=read_count,
@@ -421,4 +583,6 @@ class CascadeEngine:
             cache_overlay_video=cache_overlay_path,
             cache_mask_video=cache_mask_path,
             cache_video_playable=cache_video_playable,
+            current_device=self._format_device(self.runtime_device),
+            device_note=self.runtime_device_note,
         )

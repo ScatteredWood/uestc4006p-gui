@@ -66,3 +66,5 @@ class RunSummary:
     cache_overlay_video: str = ""
     cache_mask_video: str = ""
     cache_video_playable: bool = False
+    current_device: str = ""
+    device_note: str = ""

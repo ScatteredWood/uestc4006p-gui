@@ -16,6 +16,35 @@ UESTC4006P GUI 是一个基于 Python 的桌面图形界面工具，用于对目
 
 ---
 
+## 运行依赖（开发态）
+
+- `ultralytics`（内部会使用其 `YOLO` API）
+- `torch`（由 ultralytics 推理依赖）
+- `PySide6` / `opencv-python` / `numpy` / `PyYAML` / `Pillow`
+
+> 当前 GUI 已去除对外部 `E:\repositories\ultralytics` 源码仓库路径的运行时依赖。
+> 运行时只依赖已安装 Python 包（开发态）或打包产物（分发态）。
+
+---
+
+## Windows 打包
+
+主目标为 onefile：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1 -Mode onefile
+```
+
+备选 onedir：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1 -Mode onedir
+```
+
+默认使用 `uestc4006p_gui.spec`，并自动带上 Qt 插件、torch、cv2、ultralytics 相关依赖。
+
+---
+
 ## 项目结构
 
 ```text
