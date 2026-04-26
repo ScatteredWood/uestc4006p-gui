@@ -1,38 +1,52 @@
-# IDE
-.vscode/*
-!.vscode/settings.json
-
-# runtime / generated
-cache/
-logs/
-outputs/
-
-# PyInstaller
-build/
-dist/
-*.spec
-!uestc4006p_gui.spec
-build_temp/
-dist_temp/
-
-# packaging metadata
-*.egg-info/
-
-# python cache
+# Python cache
 __pycache__/
 *.py[cod]
-
-# test / tool cache
+*.pyc.*
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.tmp_pycache/
 
-# virtual env
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
-# OS
+# Runtime outputs
+logs/
+outputs/
+cache/
+temp/
+tmp/
+.tmp_pycache/
+.tmp_pycache_compile/
+pytest-cache-files-*/
+*.log
+*.tmp
+*.bak
+
+# Build artifacts
+build/
+dist/
+build_temp/
+dist_temp/
+*.egg-info/
+
+# PyInstaller generated files
+*.manifest
+
+# Model weights and exported models
+*.pt
+*.pth
+*.onnx
+*.engine
+*.torchscript
+*.weights
+
+# OS files
 .DS_Store
 Thumbs.db
+
+# IDE
+.idea/
+.vscode/

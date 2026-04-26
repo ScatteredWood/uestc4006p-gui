@@ -1,6 +1,9 @@
-# 可留空。留空时 GUI 启动后由用户手动选择模型文件。
+# Optional defaults for GUI startup.
+# Keep model paths empty by default; users should select their own weights in the GUI.
 det_model: ""
 seg_model: ""
 
-# 支持相对路径，默认相对仓库根目录或 exe 所在目录。
+# Relative output directory name used by default.
+# In source mode it resolves under project runtime path;
+# in frozen mode it resolves under user runtime data path.
 default_output_dir: "outputs"

@@ -1,62 +1,112 @@
-# UESTC4006P GUI
+# UESTC4006P GUI - Road Crack Detection System
 
-UESTC4006P GUI 是一个基于 Python 的桌面图形界面工具，用于对目标检测、图像分割以及级联推理流程进行可视化操作与结果导出。
+## 1. Overview
+This repository provides a PySide6-based desktop GUI for the final-year project **"Design and Implementation of Road Crack Detection System Based on YOLO Network Model"**.
 
-查看主项目：https://github.com/ScatteredWood/UESTC4006P-Individual-Project
+The GUI supports object detection, crack segmentation, and ROI-guided cascade inference.
+It is designed as the visual application layer of the project, while model training and evaluation are maintained in the main project repository.
 
----
+## 2. Relationship with Other Repositories
+- Main project repository:  
+  https://github.com/ScatteredWood/UESTC4006P-Individual-Project/tree/feature/segmentation-improvement  
+  This repository contains model training, validation, prediction scripts, and core YOLO experiments.
+- GUI repository:  
+  This repository (`uestc4006p-gui`) focuses on desktop visualization, model loading, parameter configuration, inference preview, and output export.
+- YOLO26 repository:  
+  https://github.com/ScatteredWood/uestc4006p-yolo26  
+  YOLO26-related experiments are maintained separately and are **not a required dependency** of this GUI repository.
 
-## 主要功能
+## 3. Features
+- Load custom detection and segmentation model weights.
+- Run detection-only inference.
+- Run segmentation-only inference.
+- Run ROI-guided cascade inference.
+- Adjust confidence threshold, IoU threshold, and maximum detections.
+- Preview inference results in the GUI.
+- Export visualized results.
+- Support Windows packaging with PyInstaller.
 
-- 图形化选择输入图片、视频或文件夹
-- 支持检测、分割及级联推理流程
-- 支持加载自定义模型权重与默认模型配置
-- 支持结果预览与导出
-- 支持将项目进一步打包为 Windows 单文件 `.exe`
-
----
-
-## 运行依赖（开发态）
-
-- `ultralytics`（内部会使用其 `YOLO` API）
-- `torch`（由 ultralytics 推理依赖）
-- `PySide6` / `opencv-python` / `numpy` / `PyYAML` / `Pillow`
-
-> 当前 GUI 已去除对外部 `E:\repositories\ultralytics` 源码仓库路径的运行时依赖。
-> 运行时只依赖已安装 Python 包（开发态）或打包产物（分发态）。
-
----
-
-## Windows 打包
-
-主目标为 onefile：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1 -Mode onefile
-```
-
-备选 onedir：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1 -Mode onedir
-```
-
-默认使用 `uestc4006p_gui.spec`，并自动带上 Qt 插件、torch、cv2、ultralytics 相关依赖。
-
----
-
-## 项目结构
-
+## 4. Project Structure
 ```text
 uestc4006p-gui/
+├─ README.md
+├─ pyproject.toml
+├─ .gitignore
 ├─ configs/
 │  └─ default_models.yaml
+├─ scripts/
+│  ├─ build_exe.ps1
+│  ├─ build_exe.bat
+│  └─ pyi_rth_runtime.py
 ├─ src/
 │  └─ uestc4006p_gui/
+│     ├─ __init__.py
 │     ├─ app.py
 │     ├─ core/
 │     ├─ inference/
 │     └─ ui/
 ├─ tests/
-├─ pyproject.toml
-└─ README.md
+│  └─ test_bridge_import.py
+├─ docs/
+│  └─ assets/
+│     └─ .gitkeep
+└─ uestc4006p_gui.spec
+```
+
+## 5. Installation
+Recommended environment setup:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -U pip
+pip install -e .
+```
+
+Core dependencies are declared in `pyproject.toml`, including `PySide6`, `ultralytics`, `torch`, `opencv-python`, `numpy`, `PyYAML`, and `Pillow`.
+
+GPU inference requires a correctly installed CUDA + PyTorch environment.
+CPU inference is supported but usually slower.
+
+## 6. Usage
+Run the GUI:
+
+```powershell
+python -m uestc4006p_gui.app
+```
+
+Typical workflow:
+1. Choose input image/folder or video.
+2. Choose detection and/or segmentation weights.
+3. Adjust inference parameters.
+4. Run inference.
+5. Preview and save outputs.
+
+## 7. Model Weights
+- Model weights are **not included** in this repository.
+- Users should select their own `.pt` weights exported from the training repository.
+- Detection and segmentation weights can be selected independently in the GUI.
+- `configs/default_models.yaml` stores optional defaults only and should avoid machine-specific absolute paths.
+
+Chinese note: this repository is submission-oriented for GUI delivery, so training artifacts and large model files are intentionally excluded.
+
+## 8. Packaging
+For Windows packaging, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1 -Mode onedir
+```
+
+Optional onefile mode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_exe.ps1 -Mode onefile
+```
+
+## 9. Notes
+- This repository focuses on GUI implementation and deployment demonstration.
+- Training, validation, and quantitative evaluation are maintained in the main repository.
+- YOLO26 experiments are maintained separately.
+
+## 10. License / Acknowledgement
+Please refer to the repository license if provided.
